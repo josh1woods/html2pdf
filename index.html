@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Auto HTML → PDF</title>
+
+    <!-- html2pdf.js CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+    <style>
+        /* Hidden render area */
+        #renderArea {
+            visibility: hidden;
+            position: absolute;
+            left: -9999px;
+            top: -9999px;
+        }
+    </style>
+</head>
+<body>
+
+<div id="renderArea"></div>
+
+<script>
+    // Get ?html=<encoded> from URL
+    function getHTMLFromQuery() {
+        const params = new URLSearchParams(window.location.search);
+        return params.get("html");
+    }
+
+    async function convertAndDownload() {
+        let raw = getHTMLFromQuery();
+        if (!raw) {
+            document.body.innerHTML = "<h2>No HTML received in ?html= parameter.</h2>";
+            return;
+        }
+
+        // Decode HTML
+        let decodedHTML = decodeURIComponent(raw);
+
+        // Insert into hidden container
+        const area = document.getElementById("renderArea");
+        area.innerHTML = decodedHTML;
+
+        // Auto-generate PDF + auto-download
+        const opt = {
+            margin: 0.5,
+            filename: "document.pdf",
+            html2canvas: { scale: 2 },
+            jsPDF: { unit: "in", format: "letter", orientation: "portrait" }
+        };
+
+        await html2pdf().set(opt).from(area).save();
+    }
+
+    // Automatically run when page loads
+    window.onload = convertAndDownload;
+</script>
+
+</body>
+</html>
