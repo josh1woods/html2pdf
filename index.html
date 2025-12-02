@@ -1,65 +1,89 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Auto HTML → PDF</title>
+<meta charset="UTF-8">
+<title>Auto HTML to PDF</title>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<!-- Load html2pdf bundle (must be https and correct version) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
-    <style>
-        iframe {
-            position: absolute;
-            left: -9999px;
-            top: 0;
-            width: 900px;
-            height: 1200px;
-            border: none;
-        }
-    </style>
+<style>
+    /* Iframe must be visible and rendered, but off-screen */
+    #pdfFrame {
+        position: absolute;
+        top: 0;
+        left: -2000px;
+        width: 1000px;
+        height: 1500px;
+        border: none;
+    }
+</style>
 </head>
+
 <body>
 
-<iframe id="htmlFrame"></iframe>
+<iframe id="pdfFrame"></iframe>
 
 <script>
-function getHTMLFromQuery() {
+// --- STEP 1: Read HTML from query string ---
+function getHTML() {
     const params = new URLSearchParams(window.location.search);
     return params.get("html");
 }
 
-async function convertAndDownload() {
-    let raw = getHTMLFromQuery();
+// --- STEP 2: Render HTML inside an iframe ---
+function writeIntoIframe(html) {
+    let iframe = document.getElementById("pdfFrame");
+    let doc = iframe.contentWindow.document;
 
-    if (!raw) {
-        document.body.innerHTML = "<h2>No HTML received.</h2>";
+    doc.open();
+    doc.write(html);
+    doc.close();
+
+    return iframe;
+}
+
+// --- STEP 3: Convert iframe into a PDF ---
+function convert(iframe) {
+    const body = iframe.contentWindow.document.body;
+
+    html2pdf()
+        .set({
+            margin: 0.5,
+            filename: "download.pdf",
+            html2canvas: {
+                scale: 2,
+                useCORS: true,
+                allowTaint: true
+            },
+            jsPDF: {
+                unit: "in",
+                format: "letter",
+                orientation: "portrait"
+            }
+        })
+        .from(body)
+        .save();
+}
+
+// --- MAIN FLOW ---
+window.onload = async () => {
+    const encodedHTML = getHTML();
+
+    if (!encodedHTML) {
+        document.body.innerHTML = "<h2>No HTML parameter provided.</h2>";
         return;
     }
 
-    let decodedHTML = decodeURIComponent(raw);
+    const html = decodeURIComponent(encodedHTML);
 
-    // Write the HTML into an isolated iframe (WORKS reliably)
-    let frame = document.getElementById("htmlFrame");
-    let doc = frame.contentWindow.document;
-    doc.open();
-    doc.write(decodedHTML);
-    doc.close();
+    // Write into iframe and wait for it to fully render
+    const iframe = writeIntoIframe(html);
 
-    // Wait for the iframe to fully render
+    // Give it time to render (GitHub Pages needs this delay)
     setTimeout(() => {
-        html2pdf()
-            .from(frame.contentWindow.document.body)
-            .set({
-                margin: 0.5,
-                filename: "document.pdf",
-                html2canvas: { scale: 2, useCORS: true },
-                jsPDF: { unit: "in", format: "letter" }
-            })
-            .save();
-    }, 800); // Give time for images/CSS to render
-}
-
-window.onload = () => {
-    setTimeout(convertAndDownload, 600);
+        convert(iframe);
+    }, 1200);
 };
 </script>
 
