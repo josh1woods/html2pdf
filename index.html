@@ -4,57 +4,63 @@
     <meta charset="UTF-8">
     <title>Auto HTML → PDF</title>
 
-    <!-- html2pdf.js CDN -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
     <style>
-        /* Hidden render area */
-        #renderArea {
-            visibility: hidden;
+        iframe {
             position: absolute;
             left: -9999px;
-            top: -9999px;
+            top: 0;
+            width: 900px;
+            height: 1200px;
+            border: none;
         }
     </style>
 </head>
 <body>
 
-<div id="renderArea"></div>
+<iframe id="htmlFrame"></iframe>
 
 <script>
-    // Get ?html=<encoded> from URL
-    function getHTMLFromQuery() {
-        const params = new URLSearchParams(window.location.search);
-        return params.get("html");
+function getHTMLFromQuery() {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("html");
+}
+
+async function convertAndDownload() {
+    let raw = getHTMLFromQuery();
+
+    if (!raw) {
+        document.body.innerHTML = "<h2>No HTML received.</h2>";
+        return;
     }
 
-    async function convertAndDownload() {
-        let raw = getHTMLFromQuery();
-        if (!raw) {
-            document.body.innerHTML = "<h2>No HTML received in ?html= parameter.</h2>";
-            return;
-        }
+    let decodedHTML = decodeURIComponent(raw);
 
-        // Decode HTML
-        let decodedHTML = decodeURIComponent(raw);
+    // Write the HTML into an isolated iframe (WORKS reliably)
+    let frame = document.getElementById("htmlFrame");
+    let doc = frame.contentWindow.document;
+    doc.open();
+    doc.write(decodedHTML);
+    doc.close();
 
-        // Insert into hidden container
-        const area = document.getElementById("renderArea");
-        area.innerHTML = decodedHTML;
+    // Wait for the iframe to fully render
+    setTimeout(() => {
+        html2pdf()
+            .from(frame.contentWindow.document.body)
+            .set({
+                margin: 0.5,
+                filename: "document.pdf",
+                html2canvas: { scale: 2, useCORS: true },
+                jsPDF: { unit: "in", format: "letter" }
+            })
+            .save();
+    }, 800); // Give time for images/CSS to render
+}
 
-        // Auto-generate PDF + auto-download
-        const opt = {
-            margin: 0.5,
-            filename: "document.pdf",
-            html2canvas: { scale: 2 },
-            jsPDF: { unit: "in", format: "letter", orientation: "portrait" }
-        };
-
-        await html2pdf().set(opt).from(area).save();
-    }
-
-    // Automatically run when page loads
-    window.onload = convertAndDownload;
+window.onload = () => {
+    setTimeout(convertAndDownload, 600);
+};
 </script>
 
 </body>
